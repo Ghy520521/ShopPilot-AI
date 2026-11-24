@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ShopPilot AI 控制台</title>
+<style>
+  :root{
+    --bg:#f4f6f8; --panel:#ffffff; --line:#e3e7eb; --text:#1f2933; --muted:#6b7683;
+    --accent:#0f766e; --accent-soft:#e6f2f1; --danger:#b42318; --warn:#b54708;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);font-size:15px;line-height:1.6}
+  button{font:inherit;cursor:pointer;border:none;border-radius:8px;padding:8px 14px;background:var(--accent);color:#fff}
+  button.ghost{background:#eef1f4;color:var(--text)}
+  button.sm{padding:4px 10px;font-size:13px}
+  input,select,textarea{font:inherit;width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:#fff}
+  label{font-size:13px;color:var(--muted);display:block;margin:10px 0 4px}
+  .wrap{max-width:1080px;margin:0 auto;padding:20px}
+
+  /* ===== 登录 ===== */
+  .auth-card{max-width:380px;margin:8vh auto;background:var(--panel);padding:28px;border-radius:var(--radius);box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  .auth-card h1{font-size:20px;margin-bottom:4px}
+  .auth-card p.sub{color:var(--muted);font-size:13px;margin-bottom:16px}
+  .tabs{display:flex;gap:8px;margin-bottom:14px}
+  .tabs button{flex:1;background:#eef1f4;color:var(--muted)}
+  .tabs button.active{background:var(--accent);color:#fff}
+  .msg{font-size:13px;margin-top:10px;min-height:20px}
+  .msg.err{color:var(--danger)} .msg.ok{color:var(--accent)}
+
+  /* ===== 主框架 ===== */
+  header{background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10}
+  .bar{max-width:1080px;margin:0 auto;display:flex;align-items:center;gap:6px;padding:12px 20px;flex-wrap:wrap}
+  .brand{font-weight:700;margin-right:16px}
+  .nav{display:flex;gap:4px;flex-wrap:wrap}
+  .nav button{background:transparent;color:var(--muted);padding:7px 12px}
+  .nav button.active{background:var(--accent-soft);color:var(--accent);font-weight:600}
+  .who{margin-left:auto;font-size:13px;color:var(--muted)}
+  .view{display:none}.view.active{display:block}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin-top:16px}
+  .panel h2{font-size:16px;margin-bottom:12px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+  .card{border:1px solid var(--line);border-radius:var(--radius);padding:14px;display:flex;flex-direction:column;gap:6px}
+  .card .name{font-weight:600}
+  .card .sku{font-size:12px;color:var(--muted)}
+  .card .price{color:var(--accent);font-weight:700}
+  .card .meta{font-size:12px;color:var(--muted);display:flex;gap:10px;flex-wrap:wrap}
+  .card .stars{color:#d97706}
+  .card .desc{font-size:12px;color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .row input{width:90px}
+
+  table{width:100%;border-collapse:collapse;table-layout:fixed}
+  th,td{padding:10px;border-bottom:1px solid var(--line);text-align:left;font-size:14px;word-break:break-word}
+  th{color:var(--muted);font-weight:600;background:#fafbfc}
+  .badge{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px}
+  .b-open{background:#fff4e5;color:var(--warn)} .b-done{background:var(--accent-soft);color:var(--accent)}
+  .b-closed{background:#eef1f4;color:var(--muted)} .b-pay{background:#eef1f4;color:var(--muted)}
+
+  .debug{margin-top:14px;background:#fafbfc;border:1px dashed var(--line);border-radius:8px;padding:12px;font-size:13px;color:var(--muted);white-space:pre-wrap}
+  .empty{color:var(--muted);padding:24px;text-align:center}
+  @media(max-width:600px){.grid{grid-template-columns:1fr}.who{width:100%;margin:6px 0 0}}
+</style>
+</head>
+<body>
+
+<!-- ===== 登录视图 ===== -->
+<section id="view-auth" class="view active">
+  <div class="auth-card">
+    <h1>ShopPilot AI</h1>
+    <p class="sub">智能电商与售后工单平台</p>
+    <div class="tabs">
+      <button id="tab-login" class="active" onclick="switchAuth('login')">登录</button>
+      <button id="tab-register" onclick="switchAuth('register')">注册</button>
+    </div>
+    <label>用户名</label><input id="f-username" placeholder="请输入用户名">
+    <label id="lbl-email">邮箱</label><input id="f-email" placeholder="you@example.com">
+    <label>密码</label><input id="f-password" type="password" placeholder="至少 8 位">
+    <div style="margin-top:14px"><button style="width:100%" onclick="submitAuth()">提交</button></div>
+    <div id="auth-msg" class="msg"></div>
+  </div>
+</section>
+
+<!-- ===== 主界面 ===== -->
+<div id="app" style="display:none">
+  <header>
+    <div class="bar">
+      <span class="brand">ShopPilot AI</span>
+      <nav class="nav">
+        <button data-nav="products" onclick="go('products')">商品</button>
+        <button data-nav="cart" onclick="go('cart')">购物车</button>
+        <button data-nav="orders" onclick="go('orders')">我的订单</button>
+        <button data-nav="tickets" onclick="go('tickets')">售后工单</button>
+        <button data-nav="search" onclick="go('search')">AI 检索</button>
+      </nav>
+      <span class="who" id="who"></span>
+      <button class="ghost sm" onclick="logout()">退出</button>
+    </div>
+  </header>
+  <div class="wrap">
+
+    <!-- 商品 -->
+    <section id="view-products" class="view">
+      <div class="panel">
+        <h2>商品列表</h2>
+        <div class="row" style="margin-bottom:14px;gap:10px">
+          <input id="filter-q" placeholder="搜索商品名 / SKU / 描述" style="flex:1;min-width:160px" oninput="onSearchInput()">
+          <select id="filter-category" style="width:180px" onchange="loadProducts()">
+            <option value="">全部分类</option>
+          </select>
+        </div>
+        <div id="product-grid" class="grid"></div>
+      </div>
+      <div class="panel" id="admin-product" style="display:none">
+        <h2>管理员：新建分类 / 商品</h2>
+        <div class="row">
+          <input id="new-cat-name" placeholder="新分类名称" style="width:200px">
+          <button class="ghost sm" onclick="createCategory()">建分类</button>
+        </div>
+        <label>分类（建商品前先选）</label>
+        <select id="sel-category"></select>
+        <label>商品名</label><input id="np-name">
+        <label>SKU</label><input id="np-sku">
+        <div class="row">
+          <div style="flex:1"><label>价格</label><input id="np-price" type="number" step="0.01" min="0.01"></div>
+          <div style="flex:1"><label>库存</label><input id="np-stock" type="number" min="0"></div>
+        </div>
+        <label>描述</label><input id="np-desc">
+        <div style="margin-top:12px"><button onclick="createProduct()">创建商品</button></div>
+      </div>
+    </section>
+
+    <!-- 购物车 -->
+    <section id="view-cart" class="view">
+      <div class="panel">
+        <h2>购物车</h2>
+        <table><colgroup><col style="width:34%"><col style="width:18%"><col style="width:16%"><col style="width:16%"><col style="width:16%"></colgroup>
+          <thead><tr><th>商品</th><th>单价</th><th>数量</th><th>小计</th><th></th></tr></thead>
+          <tbody id="cart-body"></tbody>
+        </table>
+        <div style="margin-top:14px"><button onclick="checkout()">用购物车下单（自动幂等键）</button></div>
+      </div>
+    </section>
+
+    <!-- 订单 -->
+    <section id="view-orders" class="view">
+      <div class="panel">
+        <h2>我的订单</h2>
+        <div id="order-list"></div>
+      </div>
+    </section>
+
+    <!-- 工单 -->
+    <section id="view-tickets" class="view">
+      <div class="panel">
+        <h2>提交售后工单</h2>
+        <label>标题</label><input id="tk-title">
+        <label>问题描述</label><textarea id="tk-desc" rows="3"></textarea>
+        <label>优先级</label>
+        <select id="tk-priority"><option value="low">低</option><option value="medium" selected>中</option><option value="high">高</option></select>
+        <div style="margin-top:12px"><button onclick="createTicket()">提交工单</button></div>
+      </div>
+      <div class="panel">
+        <h2>工单列表</h2>
+        <div id="ticket-list"></div>
+      </div>
+    </section>
+
+    <!-- AI 检索 -->
+    <section id="view-search" class="view">
+      <div class="panel">
+        <h2>自然语言检索工单</h2>
+        <input id="nl-q" placeholder="例：查一下最近7天还没有解决的高优先级物流工单">
+        <div style="margin-top:12px"><button onclick="nlSearch()">检索</button></div>
+        <div id="nl-result"></div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<script>
+// ===== 状态 =====
+let token = localStorage.getItem('sp_token');
+let me = null;
+
+function api(path, method='GET', body){
+  const opt = {method, headers:{'Content-Type':'application/json'}};
+  if(token) opt.headers['Authorization'] = 'Bearer ' + token;
+  if(body !== undefined) opt.body = JSON.stringify(body);
+  return fetch('/api'+path, opt).then(async r=>{
+    const data = await r.json().catch(()=>({}));
+    if(r.status===401){ logout(); throw new Error('登录已失效'); }
+    if(!r.ok) throw new Error(data.detail || ('错误 '+r.status));
+    return data;
+  });
+}
+function uuid(){ return 'idem-' + crypto.randomUUID(); }
+function decodeRole(){
+  if(!token) return null;
+  try{ const p = JSON.parse(atob(token.split('.')[1])); return p.role; }catch(e){ return null; }
+}
+
+// ===== 登录 / 注册 =====
+let authMode='login';
+function switchAuth(m){
+  authMode=m;
+  document.getElementById('tab-login').classList.toggle('active', m==='login');
+  document.getElementById('tab-register').classList.toggle('active', m==='register');
+  document.getElementById('lbl-email').style.display = m==='register'?'block':'none';
+  document.getElementById('f-email').style.display = m==='register'?'block':'none';
+  document.getElementById('auth-msg').textContent='';
+}
+function submitAuth(){
+  const username=document.getElementById('f-username').value.trim();
+  const password=document.getElementById('f-password').value;
+  const email=document.getElementById('f-email').value.trim();
+  const msg=document.getElementById('auth-msg');
+  const path = authMode==='login' ? '/auth/login' : '/auth/register';
+  const body = authMode==='login' ? {username,password} : {username,email,password};
+  api(path,'POST',body).then(data=>{
+    if(authMode==='register'){ msg.className='msg ok'; msg.textContent='注册成功，请登录'; switchAuth('login'); return; }
+    token=data.access_token; localStorage.setItem('sp_token',token); localStorage.setItem('sp_username',data.user.username); me=data.user; enterApp();
+  }).catch(e=>{ msg.className='msg err'; msg.textContent=e.message; });
+}
+
+function enterApp(){
+  document.getElementById('view-auth').style.display='none';
+  document.getElementById('app').style.display='block';
+  const uname = (me && me.username) || localStorage.getItem('sp_username') || '用户';
+  document.getElementById('who').textContent = uname + (decodeRole()==='admin'?'（管理员）':'');
+  if(decodeRole()==='admin') document.getElementById('admin-product').style.display='block';
+  go('products');
+}
+function logout(){ token=null; localStorage.removeItem('sp_token'); localStorage.removeItem('sp_username'); location.reload(); }
+
+function go(name){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-'+name).classList.add('active');
+  document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active', b.dataset.nav===name));
+  if(name==='products') loadProducts();
+  if(name==='cart') loadCart();
+  if(name==='orders') loadOrders();
+  if(name==='tickets') loadTickets();
+}
+
+// ===== 商品 =====
+let searchTimer = null;
+function onSearchInput(){ clearTimeout(searchTimer); searchTimer = setTimeout(loadProducts, 300); }
+
+function fmtDate(s){ return s ? String(s).slice(0,10) : '—'; }
+
+async function loadFilterCategories(){
+  const cats = await api('/products/categories');
+  const filterSel = document.getElementById('filter-category');
+  const current = filterSel.value;
+  filterSel.innerHTML = '<option value="">全部分类</option>' +
+    cats.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  filterSel.value = current;
+  if(decodeRole()==='admin'){
+    document.getElementById('sel-category').innerHTML =
+      cats.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  }
+}
+
+async function loadProducts(){
+  loadFilterCategories();
+  const q = document.getElementById('filter-q').value.trim();
+  const cat = document.getElementById('filter-category').value;
+  const params = new URLSearchParams({page:'1', page_size:'50'});
+  if(q) params.set('q', q);
+  if(cat) params.set('category_id', cat);
+  const data = await api('/products?' + params.toString());
+  const grid = document.getElementById('product-grid');
+  if(!data.items.length){ grid.innerHTML = '<div class="empty">没有匹配的商品</div>'; return; }
+  grid.innerHTML = data.items.map(p=>`
+    <div class="card">
+      <div class="name">${p.name}</div>
+      <div class="meta">
+        <span class="stars">★ ${(p.rating||0).toFixed(1)}</span>
+        <span>已售 ${p.sales||0}</span>
+        <span>上架 ${fmtDate(p.listed_at)}</span>
+      </div>
+      ${p.description?`<div class="desc">${p.description}</div>`:''}
+      <div class="sku">SKU ${p.sku} · 库存 ${p.stock}</div>
+      <div class="price">¥${p.price.toFixed(2)}</div>
+      <div class="row">
+        <input type="number" min="1" value="1" id="qty-${p.id}">
+        <button class="sm" onclick="addCart(${p.id})">加购</button>
+      </div>
+    </div>`).join('');
+}
+async function createCategory(){
+  const name=document.getElementById('new-cat-name').value.trim();
+  if(!name) return;
+  await api('/products/categories','POST',{name});
+  document.getElementById('new-cat-name').value='';
+  loadFilterCategories();
+}
+async function createProduct(){
+  const body={
+    name:document.getElementById('np-name').value,
+    sku:document.getElementById('np-sku').value,
+    price:parseFloat(document.getElementById('np-price').value),
+    stock:parseInt(document.getElementById('np-stock').value),
+    category_id:parseInt(document.getElementById('sel-category').value),
+    description:document.getElementById('np-desc').value
+  };
+  await api('/products','POST',body);
+  alert('商品已创建'); loadProducts();
+}
+async function addCart(pid){
+  const qty=parseInt(document.getElementById('qty-'+pid).value)||1;
+  await api('/cart','POST',{product_id:pid,quantity:qty});
+  alert('已加入购物车');
+}
+
+// ===== 购物车 / 下单 =====
+async function loadCart(){
+  const items=await api('/cart');
+  const body=document.getElementById('cart-body');
+  body.innerHTML = items.length ? '' : '<tr><td colspan="5" class="empty">购物车为空</td></tr>';
+  body.innerHTML = items.map(c=>`
+    <tr><td>${c.product_name}（${c.sku}）</td><td>¥${c.unit_price.toFixed(2)}</td>
+    <td>${c.quantity}</td><td>¥${c.subtotal.toFixed(2)}</td>
+    <td><button class="ghost sm" onclick="delCart(${c.product_id})">移除</button></td></tr>`).join('');
+}
+async function delCart(pid){ await api('/cart/'+pid,'DELETE'); loadCart(); }
+async function checkout(){
+  await api('/orders','POST',{idempotency_key:uuid(),use_cart:true});
+  alert('下单成功，可在「我的订单」查看'); go('orders');
+}
+
+// ===== 订单 =====
+const ORDER_STATUS={pending_payment:'待支付',paid:'已支付',shipped:'已发货',completed:'已完成',cancelled:'已取消',refunded:'已退款'};
+async function loadOrders(){
+  const list=await api('/orders');
+  const el=document.getElementById('order-list');
+  el.innerHTML = list.length?'':'<div class="empty">暂无订单</div>';
+  el.innerHTML = list.map(o=>`
+    <div class="panel" style="margin:10px 0">
+      <div class="row"><b>${o.order_no}</b>
+      <span class="badge b-pay">${ORDER_STATUS[o.status]||o.status}</span>
+      <span style="margin-left:auto;color:var(--accent);font-weight:700">¥${o.total_amount.toFixed(2)}</span></div>
+      <div style="color:var(--muted);font-size:13px;margin-top:6px">
+        ${o.items.map(i=>`${i.product_name} ×${i.quantity}（¥${i.unit_price.toFixed(2)}）`).join('，')}
+      </div>
+    </div>`).join('');
+}
+
+// ===== 工单 =====
+const TICKET_STATUS={open:'待处理',in_progress:'处理中',resolved:'已解决',closed:'已关闭'};
+async function createTicket(){
+  const body={
+    title:document.getElementById('tk-title').value,
+    description:document.getElementById('tk-desc').value,
+    priority:document.getElementById('tk-priority').value
+  };
+  await api('/tickets','POST',body);
+  alert('工单已提交'); loadTickets();
+}
+async function loadTickets(){
+  const list=await api('/tickets');
+  const el=document.getElementById('ticket-list');
+  el.innerHTML = list.length?'':'<div class="empty">暂无工单</div>';
+  el.innerHTML = list.map(t=>`
+    <div class="panel" style="margin:10px 0">
+      <div class="row"><b>${t.public_no} · ${t.title}</b>
+      <span class="badge ${t.status==='open'?'b-open':t.status==='closed'?'b-closed':'b-done'}">${TICKET_STATUS[t.status]}</span>
+      <span style="margin-left:auto;color:var(--muted);font-size:13px">优先级 ${t.priority}</span></div>
+      <div style="margin-top:6px;color:var(--muted)">${t.description}</div>
+      <div class="row" style="margin-top:10px">
+        ${t.status==='open'?`<button class="sm" onclick="transition(${t.id},'in_progress')">开始处理</button>`:''}
+        ${t.status==='in_progress'?`<button class="sm" onclick="transition(${t.id},'resolved')">标记解决</button>`:''}
+        ${t.status==='resolved'?`<button class="sm" onclick="transition(${t.id},'closed')">关闭工单</button>`:''}
+      </div>
+    </div>`).join('');
+}
+async function transition(id,to){ await api(`/tickets/${id}/transition`,'POST',{to_status:to}); loadTickets(); }
+
+// ===== AI 检索 =====
+async function nlSearch(){
+  const q=document.getElementById('nl-q').value.trim();
+  const el=document.getElementById('nl-result');
+  if(!q) return;
+  const data=await api('/tickets/search','POST',{question:q,page:1,page_size:10});
+  const items=data.items.map(t=>`
+    <div class="panel" style="margin:10px 0">
+      <div class="row"><b>${t.public_no} · ${t.title}</b>
+      <span class="badge b-done">${TICKET_STATUS[t.status]}</span></div>
+      <div style="margin-top:6px;color:var(--muted)">${t.description}</div>
+    </div>`).join('');
+  el.innerHTML = (items||'<div class="empty">没有检索到匹配工单</div>') +
+    `<div class="debug">解析计划：${JSON.stringify(data.debug.plan,null,2)}
+结构化命中 ${data.debug.structured_count} · 语义命中 ${data.debug.semantic_count} · 融合后 ${data.debug.merged_count}</div>`;
+}
+
+// ===== 初始化 =====
+if(token){
+  me = JSON.parse(atob(token.split('.')[1]));
+  // 拉取用户信息失败则重新登录
+  api('/products').then(enterApp).catch(()=>logout());
+}
+</script>
+</body>
+</html>
